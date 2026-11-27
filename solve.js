@@ -1,9 +1,10 @@
 // Anchored fast diff for makefun-diff 1.0.0-shaped inputs.
 // Lines are interned to integer ids; unique lines whose LIS chain survives a windowed
 // crossing filter, a strict +-10 identical-diagonal-window test, and a phase-pinning test
-// (at least 4 other lines in the window unique in both texts) become anchors, and an exact
-// typed-array Myers search (deletion-preferred tie-break, as in the reference) runs only on
-// the segments between anchors. Anchors near the trimmed region's edge are never used.
+// (at least 4 other lines in the window unique in both texts, at least 1 on each side)
+// become anchors, and an exact typed-array Myers search (deletion-preferred tie-break,
+// as in the reference) runs only on the segments between anchors. Anchors near the
+// trimmed region's edge are never used.
 const FORMAT = 'makefun-diff/1';
 const CONTEXT = 3;
 const KEEP = 0, DELETE = 1, INSERT = 2;
@@ -222,13 +223,13 @@ function lisAnchors(A, a0, N, B, b0, M, nextId) {
     // Phase pinning: the window must contain at least 4 other lines that are unique in both
     // texts. A window made only of repeated lines (e.g. pass/return/} cycles) can be matched
     // at a shifted phase, so it does not pin the anchor to the reference's alignment.
-    let pins = 0;
+    let pins = 0, pinsL = 0, pinsR = 0;
     for (let s = -10; s <= 10; s++) {
       if (s === 0) continue;
       const id = A[a0 + i + s];
-      if (cntA[id] === 1 && cntB[id] === 1) pins++;
+      if (cntA[id] === 1 && cntB[id] === 1) { pins++; if (s < 0) pinsL++; else pinsR++; }
     }
-    if (pins < 4) continue;
+    if (pins < 4 || pinsL < 1 || pinsR < 1) continue;
     anchors.push([i, j]);
   }
   return anchors;
