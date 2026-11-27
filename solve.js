@@ -1,4 +1,9 @@
-// Fast exact reimplementation of makefun-diff 1.0.0.
+// Anchored fast diff for makefun-diff 1.0.0-shaped inputs.
+// Lines are interned to integer ids; unique lines whose LIS chain survives a windowed
+// crossing filter and a strict +-10 identical-diagonal-window test become anchors, and an
+// exact typed-array Myers search (deletion-preferred tie-break, as in the reference) runs
+// only on the segments between anchors. Anchors near the trimmed region's edge are never
+// used, so those parts are always searched exactly.
 const FORMAT = 'makefun-diff/1';
 const CONTEXT = 3;
 const KEEP = 0, DELETE = 1, INSERT = 2;
@@ -204,13 +209,14 @@ function lisAnchors(A, a0, N, B, b0, M, nextId) {
   }
   for (const t of lisIdx) {
     if (leftMax.get(t) > pairB[t] || rightMin.get(t) < pairB[t]) continue;
-    // Identical-window filter: +-10 lines around the anchor must match on its diagonal.
+    // Identical-window filter: the full +-10 window around the anchor must lie inside the
+    // trimmed region and match on its diagonal. Anchors near the region edge are rejected
+    // outright (no clamping): the segment Myers search covers those parts exactly instead.
     const i = pairA[t], j = pairB[t];
+    if (i - 10 < 0 || i + 10 >= N || j - 10 < 0 || j + 10 >= M) continue;
     let okWin = true;
     for (let s = -10; s <= 10; s++) {
-      const ii = i + s, jj = j + s;
-      if (ii < 0 || jj < 0 || ii >= N || jj >= M) continue;
-      if (A[a0 + ii] !== B[b0 + jj]) { okWin = false; break; }
+      if (A[a0 + i + s] !== B[b0 + j + s]) { okWin = false; break; }
     }
     if (!okWin) continue;
     anchors.push([i, j]);
